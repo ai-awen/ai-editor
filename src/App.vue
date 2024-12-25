@@ -1,10 +1,11 @@
 <template>
-  <a-layout class="layout">
+  <a-layout class="layout" style="overflow: hidden;">
     <a-layout-sider
       v-model:collapsed="collapsed"
       :trigger="null"
       collapsible
       class="sider"
+      style="overflow: hidden;"
     >
       <div class="logo">AI Editor</div>
       <div class="doc-list">
@@ -59,8 +60,8 @@
         </a-button>
       </div>
     </a-layout-sider>
-    <a-layout>
-      <a-layout-content class="content">
+    <a-layout       style="overflow: hidden;"    >
+      <a-layout-content class="content"       style="overflow: hidden;"      >
         <router-view></router-view>
       </a-layout-content>
     </a-layout>
@@ -121,6 +122,13 @@ const deleteDocument = (id: number) => {
   }
 }
 </script>
+
+<style>
+.content,.layout,.sider{
+  overflow: hidden !important;
+  min-height: 100vh;
+}
+</style>
 
 <style scoped>
 .layout {
@@ -293,7 +301,6 @@ const deleteDocument = (id: number) => {
 
 .content {
   margin-left: 200px; /* 侧边栏宽度 */
-  padding: 24px;
   background: #fff;
   min-height: 280px;
   transition: margin-left 0.2s;

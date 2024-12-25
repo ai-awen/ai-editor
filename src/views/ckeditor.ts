@@ -117,16 +117,3 @@ export async function createEditor(element: HTMLElement) {
         }
     })
 }
-
-
-/*
- * @description 编辑器At 列表渲染列表项
- */
-function customItemRenderer(item) {
-    let insert = null
-    insert = document.createElement("div")
-    insert.appendChild(document.createTextNode(item.id))
-    return insert;
-}
-
-
