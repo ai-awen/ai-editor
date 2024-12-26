@@ -200,7 +200,7 @@ const onEditorReady = (editor: Editor) => {
 
     editorContent.addEventListener('scroll', handleScroll, { passive: true })
 
-    // ��������存清理函数，在组件销毁时调用
+    // ��������������存清理函数，在组件销毁时调用
     onBeforeUnmount(() => {
       editorContent.removeEventListener('scroll', handleScroll)
       if (updateTimeout) {
@@ -226,8 +226,14 @@ const highlightCurrentLine = () => {
     const editor = editorInstance.value
     const selection = editor.editing.view.document.selection
     
-    // 如果是选区（不是光标），则不高亮
-    if (!selection.isCollapsed) return
+    // 如果是选区（不是光标），则移除高亮并返回
+    if (!selection.isCollapsed) {
+      const highlightElement = document.querySelector('.line-highlight')
+      if (highlightElement) {
+        highlightElement.classList.remove('active')
+      }
+      return
+    }
 
     const viewPosition = selection.getFirstPosition()
     if (!viewPosition) return
@@ -405,7 +411,7 @@ onBeforeUnmount(() => {
   left: -66px; /* 50px宽度 + 16px padding */
   right: 0;
   height: 21px;
-  background-color: rgba(207, 232, 255, 0.5);
+  background-color: rgba(207, 232, 255, 0.2);
   pointer-events: none;
   z-index: 1;
   display: none;
@@ -450,26 +456,10 @@ onBeforeUnmount(() => {
   z-index: 2;
 }
 
-/* 移除之前的编辑器内容高亮样式 */
-:deep(.ck-content .current-line) {
-  background-color: transparent !important;
-}
-
-/* 编辑器高亮层样式 */
-:deep(.line-highlight) {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 21px;
-  background-color: rgba(207, 232, 255, 0.5);
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* 确保行号文字在高亮层之上 */
+/* 行号样式 */
 .line-number {
   position: relative;
-  z-index: 10000;
+  z-index: 2;
   color: inherit;
 }
 
@@ -499,7 +489,7 @@ onBeforeUnmount(() => {
   overflow: hidden; /* 确保高亮不会超出容器 */
 }
 
-/* 行号容器样式 */
+/* 行号容���样式 */
 .line-numbers {
   width: 50px;
   min-width: 50px;
@@ -607,7 +597,7 @@ onBeforeUnmount(() => {
   transition: color 0.1s ease;
 }
 
-/* 当前行号高亮 */
+/* ���前行号高亮 */
 :deep(.ck-content .current-line) ~ .line-numbers .line-number {
   color: #428bca;
   font-weight: 600;
@@ -761,7 +751,7 @@ onBeforeUnmount(() => {
   left: 0;
   right: 0;
   height: 21px;
-  background-color: rgba(207, 232, 255, 0.5);
+  background-color: rgba(207, 232, 255, 0.2);
   pointer-events: none;
   z-index: 10000;
 }
