@@ -87,23 +87,25 @@ const updateLineNumbers = () => {
     const editorElement = document.querySelector('.ck-editor__editable')
     if (!editorElement) return
 
-    // 获取所有段落元素
-    const paragraphs = editorElement.querySelectorAll('p')
-    let totalLines = 0
+    // 获取所有块级元素（包括空行）
+    const blocks = editorElement.children
+    let totalLines = blocks.length
 
-    // 遍历每个段落计算实际行数
-    paragraphs.forEach(paragraph => {
-      // 获取段落的实际高度和行高
-      const computedStyle = window.getComputedStyle(paragraph)
-      const paragraphHeight = paragraph.offsetHeight
+    // 遍历每个块级元素计算实际行数
+    Array.from(blocks).forEach(block => {
+      // 获取块级元素的实际高度和行高
+      const computedStyle = window.getComputedStyle(block)
+      const blockHeight = block.offsetHeight
       const lineHeight = parseFloat(computedStyle.lineHeight)
       
-      // 计算这个段落占用的实际行数
-      const paragraphLines = Math.ceil(paragraphHeight / lineHeight)
-      totalLines += paragraphLines
+      // 计算这个块级元素占用的实际行数（减去已经计算的一行）
+      const blockLines = Math.ceil(blockHeight / lineHeight) - 1
+      if (blockLines > 0) {
+        totalLines += blockLines
+      }
     })
 
-    // 如果没有内容少显示一行
+    // 如果没有内容至少显示一行
     totalLines = Math.max(1, totalLines)
     
     // 更新行号
@@ -159,8 +161,10 @@ const onEditorReady = (editor: Editor) => {
 
   // 监听编辑器事件
   const handleChange = () => {
-    updateLineNumbersDebounced()
-    requestAnimationFrame(highlightCurrentLine)
+    requestAnimationFrame(() => {
+      updateLineNumbers()
+      highlightCurrentLine()
+    })
   }
 
   // 监听内容变化
@@ -178,7 +182,10 @@ const onEditorReady = (editor: Editor) => {
 
   // 监听回车键
   editor.editing.view.document.on('enter', () => {
-    requestAnimationFrame(highlightCurrentLine)
+    requestAnimationFrame(() => {
+      updateLineNumbers()
+      highlightCurrentLine()
+    })
   })
 
   // 监听编辑器的滚动事件
@@ -221,50 +228,52 @@ const highlightCurrentLine = () => {
     // 如果是选区（不是光标），则不高亮
     if (!selection.isCollapsed) return
 
-    // 获取光标位置的 DOM 元素
     const viewPosition = selection.getFirstPosition()
     if (!viewPosition) return
 
     const domConverter = editor.editing.view.domConverter
     const domPosition = domConverter.viewPositionToDom(viewPosition)
     if (!domPosition) return
-    
-    // 获取最近的段落元素
-    let currentElement = domPosition.parent
-    while (currentElement && currentElement.nodeType !== Node.ELEMENT_NODE) {
-      currentElement = currentElement.parentNode
-    }
-
-    // 如果找不到元素节点，尝试使用文本节点的父元素
-    if (!currentElement && domPosition.parent) {
-      currentElement = domPosition.parent.parentElement
-    }
 
     const editorElement = document.querySelector('.ck-editor__editable')
-    if (!editorElement || !currentElement) return
+    if (!editorElement) return
 
-    // 获取当前元素相对编辑器的位置
-    const elementRect = currentElement.getBoundingClientRect()
-    const editorRect = editorElement.getBoundingClientRect()
-    
-    // 计算光标在元素内的相对位置
-    const cursorOffset = domPosition.offset
-    const textNode = domPosition.parent
-    let cursorTop = elementRect.top
-    
-    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-      const range = document.createRange()
-      range.setStart(textNode, cursorOffset)
-      range.setEnd(textNode, cursorOffset)
-      const cursorRect = range.getBoundingClientRect()
-      cursorTop = cursorRect.top
+    // 获取编辑器内所有块级元素
+    const blocks = Array.from(editorElement.children)
+    let currentLine = 0
+
+    // 遍历块级元素直到找到包含光标的元素
+    for (const block of blocks) {
+      if (block.contains(domPosition.parent) || block === domPosition.parent) {
+        // 找到包含光标的块级元素
+        const blockRect = block.getBoundingClientRect()
+        const editorRect = editorElement.getBoundingClientRect()
+        
+        // 计算光标在块级元素内的位置
+        let cursorTop = blockRect.top
+        if (domPosition.parent.nodeType === Node.TEXT_NODE) {
+          const range = document.createRange()
+          range.setStart(domPosition.parent, domPosition.offset)
+          range.setEnd(domPosition.parent, domPosition.offset)
+          const cursorRect = range.getBoundingClientRect()
+          if (cursorRect.top > 0) {
+            cursorTop = cursorRect.top
+          }
+        }
+
+        // 计算当前行号
+        const relativeTop = cursorTop - editorRect.top
+        const lineHeight = 21 // 固定行高
+        currentLine = Math.floor(relativeTop / lineHeight) + 1
+        break
+      } else {
+        // 累加之前块级元素的行数
+        const computedStyle = window.getComputedStyle(block)
+        const blockHeight = block.offsetHeight
+        const lineHeight = parseFloat(computedStyle.lineHeight)
+        currentLine += Math.ceil(blockHeight / lineHeight)
+      }
     }
-
-    const relativeTop = cursorTop - editorRect.top
-
-    // 计算当前行号
-    const lineHeight = 21 // 固定行高
-    const currentLine = Math.floor(relativeTop / lineHeight) + 1
 
     // 高亮对应的行号
     const lineNumbers = document.querySelectorAll('.line-number')
@@ -346,6 +355,8 @@ onBeforeUnmount(() => {
   flex-direction: row;
   width: 100%;
   height: 100%;
+  position: relative;
+  overflow: hidden;
 }
 
 .line-numbers {
@@ -376,10 +387,47 @@ onBeforeUnmount(() => {
   transition: color 0.1s ease;
 }
 
+/* 添加全宽高亮元素 */
+.line-number::before {
+  content: '';
+  position: absolute;
+  left: -50px; /* 确保覆盖整个行号区域 */
+  right: -3000px; /* 延伸到编辑器区域 */
+  height: 100%;
+  background-color: transparent;
+  pointer-events: none; /* 确保不影响编辑器操作 */
+  z-index: 0; /* 置于底层 */
+  transition: background-color 0.1s ease;
+}
+
+.line-number.current-line::before {
+  background-color: rgba(66, 139, 202, 0.1); /* 淡蓝色背景 */
+}
+
+/* 确保行号文字在高亮层之上 */
+.line-number {
+  position: relative;
+  z-index: 1;
+}
+
+/* 调整编辑器容器样式以支持高亮效果 */
+.editor-container {
+  position: relative;
+  overflow: hidden;
+}
+
+/* 确保编辑器内容在高亮层之上 */
+.editor-wrapper {
+  position: relative;
+  z-index: 1;
+}
+
+/* 移除原有的行号高亮背景色 */
 .line-number.current-line {
   color: #428bca;
   font-weight: 600;
-  background-color: rgba(66, 139, 202, 0.1);
+  /* 移除原有的背景色 */
+  background-color: transparent;
 }
 
 /* CKEditor 样式覆盖 */
