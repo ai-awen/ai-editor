@@ -224,17 +224,6 @@ const highlightCurrentLine = () => {
     if (currentParagraph) {
       // 添加高亮类
       currentParagraph.classList.add('current-line')
-
-      // 确保高亮元素在视图中可见
-      const editorElement = document.querySelector('.ck-editor__editable')
-      if (editorElement) {
-        const editorRect = editorElement.getBoundingClientRect()
-        const elementRect = currentParagraph.getBoundingClientRect()
-        
-        if (elementRect.top < editorRect.top || elementRect.bottom > editorRect.bottom) {
-          currentParagraph.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-        }
-      }
     }
   } catch (error) {
     console.error('Error highlighting current line:', error)
@@ -547,7 +536,7 @@ onBeforeUnmount(() => {
   box-shadow: none !important;
 }
 
-/* 移除工具栏按钮的聚焦边框 */
+/* 移除工具栏按���的聚焦边框 */
 :deep(.ck.ck-button:focus),
 :deep(.ck.ck-button.ck-on:focus) {
   border: none !important;
