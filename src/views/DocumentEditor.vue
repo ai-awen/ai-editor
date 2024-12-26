@@ -200,7 +200,7 @@ const onEditorReady = (editor: Editor) => {
 
     editorContent.addEventListener('scroll', handleScroll, { passive: true })
 
-    // ����存清理函数，在组件销毁时调用
+    // ��������存清理函数，在组件销毁时调用
     onBeforeUnmount(() => {
       editorContent.removeEventListener('scroll', handleScroll)
       if (updateTimeout) {
@@ -243,7 +243,7 @@ const highlightCurrentLine = () => {
     const blocks = Array.from(editorElement.children)
     let currentLine = 0
 
-    // 遍历块级元素直到找到���含光标的元素
+    // 遍历块级元素���到���到���含光标的元素
     for (const block of blocks) {
       if (block.contains(domPosition.parent) || block === domPosition.parent) {
         // 找到包含光标的块级元素
@@ -405,14 +405,65 @@ onBeforeUnmount(() => {
   left: -66px; /* 50px宽度 + 16px padding */
   right: 0;
   height: 21px;
-  background-color: rgb(207, 232, 255);
+  background-color: rgba(207, 232, 255, 0.5);
   pointer-events: none;
-  z-index: 9999;
+  z-index: 1;
   display: none;
 }
 
 .line-highlight.active {
   display: block;
+}
+
+/* 确保编辑器内容在高亮层之上 */
+:deep(.ck-editor__editable) {
+  position: relative;
+  z-index: 2;
+}
+
+:deep(.ck-content) {
+  position: relative;
+  z-index: 2;
+}
+
+/* 编辑器主体样式 */
+:deep(.ck-editor__main) {
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative;
+  z-index: 2;
+}
+
+.editor-wrapper {
+  flex: 1;
+  height: 100%;
+  position: relative;
+  z-index: 2;
+}
+
+/* 确保行号在高亮层之上 */
+.line-numbers {
+  position: relative;
+  z-index: 2;
+}
+
+/* 移除之前的编辑器内容高亮样式 */
+:deep(.ck-content .current-line) {
+  background-color: transparent !important;
+}
+
+/* 编辑器高亮层样式 */
+:deep(.line-highlight) {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 21px;
+  background-color: rgba(207, 232, 255, 0.5);
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* 确保行号文字在高亮层之上 */
@@ -710,7 +761,7 @@ onBeforeUnmount(() => {
   left: 0;
   right: 0;
   height: 21px;
-  background-color: rgb(207, 232, 255);
+  background-color: rgba(207, 232, 255, 0.5);
   pointer-events: none;
   z-index: 10000;
 }
