@@ -214,6 +214,10 @@ const highlightCurrentLine = () => {
 
     // 获取当前选区的范围
     const range = selection.getRangeAt(0)
+    
+    // 如果是选区（不是光标），则不高亮
+    if (!range.collapsed) return
+
     const currentNode = range.startContainer
 
     // 查找当前段落
@@ -536,7 +540,7 @@ onBeforeUnmount(() => {
   box-shadow: none !important;
 }
 
-/* 移除工具栏按���的聚焦边框 */
+/* 移除工具栏按钮的聚焦边框 */
 :deep(.ck.ck-button:focus),
 :deep(.ck.ck-button.ck-on:focus) {
   border: none !important;
