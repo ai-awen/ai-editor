@@ -62,42 +62,51 @@ const editorConfig = {
 const updateLineNumbers = () => {
   if (!editorInstance.value) return
 
-  const rootElement = (editorInstance.value as any).model.document.getRoot()
-  if (!rootElement) return
-
   try {
-    // 计算实际的行数
-    const paragraphs = Array.from(rootElement.getChildren())
-    let actualLines = 0
+    // 获取编辑器的可编辑区域元素
+    const editorElement = document.querySelector('.ck-editor__editable')
+    if (!editorElement) return
 
-    // 遍历段落计算行数
-    paragraphs.forEach((paragraph: any) => {
-      if (paragraph.is('element', 'paragraph')) {
-        // 计算段落中的软换行数
-        const children = Array.from(paragraph.getChildren())
-        const softBreaks = children.filter((child: any) => 
-          child.is('element', 'softBreak')
-        ).length
+    // 获取所有段落元素
+    const paragraphs = editorElement.querySelectorAll('p')
+    let totalLines = 0
 
-        // 每个段落至少算一行
-        actualLines += 1 + Math.max(0, softBreaks)
-      }
+    // 遍历每个段落计算实际行数
+    paragraphs.forEach(paragraph => {
+      // 获取段落的实际高度和行高
+      const computedStyle = window.getComputedStyle(paragraph)
+      const paragraphHeight = paragraph.offsetHeight
+      const lineHeight = parseFloat(computedStyle.lineHeight)
+      
+      // 计算这个段落占用的实际行数
+      const paragraphLines = Math.ceil(paragraphHeight / lineHeight)
+      totalLines += paragraphLines
     })
 
-    // 添加安全检查，确保行数是有效的正整数
-    const safeLineCount = Math.max(1, Math.min(actualLines, 9999))
+    // 如果没有内容，至少显示一行
+    totalLines = Math.max(1, totalLines)
     
-    // 只有当行数是有效的正整数时才更新
-    if (Number.isInteger(safeLineCount) && safeLineCount > 0) {
-      lineCount.value = safeLineCount
-    } else {
-      lineCount.value = 1 // 默认显示一行
-    }
+    // 更新行号
+    lineCount.value = totalLines
 
   } catch (error) {
     console.error('Error calculating line numbers:', error)
     lineCount.value = 1 // 出错时显示一行
   }
+}
+
+// 使用 ResizeObserver 监听编辑器内容区域的大小变化
+const setupResizeObserver = (editorElement: Element) => {
+  const resizeObserver = new ResizeObserver(() => {
+    updateLineNumbersDebounced()
+  })
+
+  resizeObserver.observe(editorElement)
+
+  // 在组件卸载时清理
+  onBeforeUnmount(() => {
+    resizeObserver.disconnect()
+  })
 }
 
 // 使用防抖函数来避免频繁更新
@@ -114,7 +123,15 @@ const updateLineNumbersDebounced = () => {
 // 编辑器就绪事件处理
 const onEditorReady = (editor: Editor) => {
   editorInstance.value = editor
-  updateLineNumbers()
+  
+  // 等待 DOM 更新后再初始化
+  setTimeout(() => {
+    const editorElement = document.querySelector('.ck-editor__editable')
+    if (editorElement) {
+      updateLineNumbers()
+      setupResizeObserver(editorElement)
+    }
+  }, 0)
 
   // 直接监听编辑器的 change 事件
   editor.model.document.on('change:data', updateLineNumbersDebounced)
@@ -306,7 +323,7 @@ const onEditorReady = (editor: Editor) => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
 }
 
-/* 移除所有聚焦状态的边框和阴影 */
+/* 移除所有聚���状态的边框和阴影 */
 :deep(.ck.ck-editor__editable.ck-focused),
 :deep(.ck.ck-editor__editable:focus),
 :deep(.ck.ck-editor__editable.ck-focused[role="textbox"]),
