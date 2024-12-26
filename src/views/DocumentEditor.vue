@@ -6,12 +6,13 @@
           v-for="n in lineCount" 
           :key="n" 
           class="line-number"
+          :class="{ 'current-line': n === currentLineNumber }"
         >
+          <div class="line-highlight" :class="{ active: n === currentLineNumber }"></div>
           {{ n }}
         </div>
       </div>
       <div class="editor-wrapper">
-        <div class="line-highlight"></div>
         <ckeditor
           :editor="editor"
           v-model="editorData"
@@ -33,6 +34,7 @@ const editor = ref(DecoupledEditor)
 const editorInstance = ref<Editor | null>(null)
 const editorData = ref('')
 const lineCount = ref(1)
+const currentLineNumber = ref(1)
 
 // 编辑器配置
 const editorConfig = {
@@ -143,11 +145,11 @@ const updateLineNumbersDebounced = () => {
   }, 16) // 降低到一帧的时间（约16.7ms）
 }
 
-// 编辑器就绪事件处理
+// 编辑器就绪事件���理
 const onEditorReady = (editor: Editor) => {
   editorInstance.value = editor
   
-  // 等待 DOM 更新后再初始化
+  // 等����������� DOM 更新后再初始化
   requestAnimationFrame(() => {
     const editorElement = document.querySelector('.ck-editor__editable')
     const lineNumbers = document.querySelector('.line-numbers')
@@ -195,7 +197,7 @@ const onEditorReady = (editor: Editor) => {
     })
   })
 
-  // 组件销毁时清理
+  // 组件��毁��清��
   onBeforeUnmount(() => {
     const editorElement = document.querySelector('.ck-editor__editable')
     if (editorElement) {
@@ -210,21 +212,12 @@ const highlightCurrentLine = () => {
   if (!editorInstance.value) return
 
   try {
-    // 移除之前的高亮
-    const prevHighlights = document.querySelectorAll('.line-number.current-line')
-    prevHighlights.forEach(element => {
-      element.classList.remove('current-line')
-    })
-
     const editor = editorInstance.value
     const selection = editor.editing.view.document.selection
     
-    // 如果是选区（不是光标），则移除高亮并返回
+    // 如果是选区（不是光标），则移除高亮
     if (!selection.isCollapsed) {
-      const highlightElement = document.querySelector('.line-highlight')
-      if (highlightElement) {
-        highlightElement.classList.remove('active')
-      }
+      currentLineNumber.value = 0
       return
     }
 
@@ -242,7 +235,7 @@ const highlightCurrentLine = () => {
     const blocks = Array.from(editorElement.children)
     let currentLine = 0
 
-    // 遍历块级元素���到���到���含光标的元素
+    // 遍历块级元素找到包含光标的元素
     for (const block of blocks) {
       if (block.contains(domPosition.parent) || block === domPosition.parent) {
         // 找到包含光标的块级元素
@@ -265,13 +258,6 @@ const highlightCurrentLine = () => {
         const relativeTop = cursorTop - editorRect.top
         const lineHeight = 21 // 固定行高
         currentLine = Math.floor(relativeTop / lineHeight) + 1
-
-        // 更新高亮元素位置
-        const highlightElement = document.querySelector('.line-highlight')
-        if (highlightElement) {
-          highlightElement.style.top = `${Math.floor(relativeTop / lineHeight) * lineHeight}px`
-          highlightElement.classList.add('active')
-        }
         break
       } else {
         // 累加之前块级元素的行数
@@ -282,11 +268,8 @@ const highlightCurrentLine = () => {
       }
     }
 
-    // 高亮对应的行号
-    const lineNumbers = document.querySelectorAll('.line-number')
-    if (currentLine > 0 && currentLine <= lineNumbers.length) {
-      lineNumbers[currentLine - 1].classList.add('current-line')
-    }
+    // 更新当前行号
+    currentLineNumber.value = currentLine > 0 ? currentLine : 0
   } catch (error) {
     console.error('Error highlighting current line:', error)
   }
@@ -378,7 +361,7 @@ onBeforeUnmount(() => {
   text-align: right;
   overflow: hidden;
   position: relative;
-  z-index: 1;
+  z-index: 10;
 }
 
 .line-number {
@@ -387,6 +370,9 @@ onBeforeUnmount(() => {
   line-height: 21px;
   white-space: nowrap;
   display: block;
+  position: relative;
+  color: #999;
+  transition: color 0.1s ease;
 }
 
 .editor-wrapper {
@@ -439,28 +425,30 @@ onBeforeUnmount(() => {
 /* 新的高亮元素样式 */
 .line-highlight {
   position: absolute;
-  left: -66px; /* 50px宽度 + 16px padding */
-  right: 0;
+  left: -8px;
+  width: 2000px;
+  top: 0;
   height: 21px;
   background-color: rgba(207, 232, 255, 0.2);
   pointer-events: none;
-  z-index: 1;
-  display: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  z-index: 1000000 !important;
 }
 
 .line-highlight.active {
-  display: block;
+  opacity: 1;
 }
 
-/* 确保编辑器内容在高亮层之上 */
+/* 确保编辑器内容不会遮挡高亮 */
 :deep(.ck-editor__editable) {
-  position: relative;
-  z-index: 2;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 :deep(.ck-content) {
-  position: relative;
-  z-index: 2;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 /* 编辑器主体样式 */
@@ -470,18 +458,18 @@ onBeforeUnmount(() => {
   padding: 0 !important;
   display: flex !important;
   flex-direction: column !important;
-  position: relative;
-  z-index: 2;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 .editor-wrapper {
   flex: 1;
   height: 100%;
-  position: relative;
-  z-index: 2;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
-/* 确保行号在高亮层之上 */
+/* 确保行号在正确的层级 */
 .line-numbers {
   position: relative;
   z-index: 2;
@@ -491,7 +479,6 @@ onBeforeUnmount(() => {
 .line-number {
   position: relative;
   z-index: 2;
-  color: inherit;
 }
 
 .line-number.current-line {
@@ -509,18 +496,19 @@ onBeforeUnmount(() => {
   flex-direction: row;
   width: 100%;
   height: 100%;
-  position: relative;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 .editor-wrapper {
   flex: 1;
   height: 100%;
-  position: relative;
-  z-index: 1;
+  position: relative !important;
+  z-index: 1 !important;
   overflow: hidden; /* 确保高亮不会超出容器 */
 }
 
-/* 行号容���样式 */
+/* 行号容样式 */
 .line-numbers {
   width: 50px;
   min-width: 50px;
@@ -569,15 +557,15 @@ onBeforeUnmount(() => {
   padding: 0 !important;
   display: flex !important;
   flex-direction: column !important;
-  position: relative;
-  z-index: 1;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 .editor-wrapper {
   flex: 1;
   height: 100%;
-  position: relative;
-  z-index: 1;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 /* 当前行高亮样式 */
@@ -628,7 +616,7 @@ onBeforeUnmount(() => {
   transition: color 0.1s ease;
 }
 
-/* ���前行号高亮 */
+/* 前行号高亮 */
 :deep(.ck-content .current-line) ~ .line-numbers .line-number {
   color: #428bca;
   font-weight: 600;
@@ -711,7 +699,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
 }
 
-/* 移除所有聚状态的边框和阴影 */
+/* 移除所有聚状态的边框和��影 */
 :deep(.ck.ck-editor__editable.ck-focused),
 :deep(.ck.ck-editor__editable:focus),
 :deep(.ck.ck-editor__editable.ck-focused[role="textbox"]),
@@ -785,5 +773,64 @@ onBeforeUnmount(() => {
   background-color: rgba(207, 232, 255, 0.2);
   pointer-events: none;
   z-index: 10000;
+}
+
+/* 编辑器相关元素的 z-index */
+:deep(.ck-editor__editable) {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+:deep(.ck-content) {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+:deep(.ck-toolbar) {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+:deep(.ck-editor__main) {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* 高亮元素样式 */
+.line-highlight {
+  position: absolute;
+  left: -8px;
+  width: 2000px;
+  top: 0;
+  height: 21px;
+  background-color: rgba(207, 232, 255, 0.2);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  z-index: 1000000 !important;
+}
+
+.line-highlight.active {
+  opacity: 1;
+}
+
+/* 编辑器容器样式 */
+.editor-container {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.editor-wrapper {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* 确保所有编辑器相关的弹出层都在高亮下方 */
+:deep(.ck-balloon-panel) {
+  z-index: 1 !important;
+}
+
+:deep(.ck-dropdown__panel) {
+  z-index: 1 !important;
 }
 </style>
