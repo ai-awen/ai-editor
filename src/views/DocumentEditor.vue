@@ -11,6 +11,7 @@
         </div>
       </div>
       <div class="editor-wrapper">
+        <div class="line-highlight"></div>
         <ckeditor
           :editor="editor"
           v-model="editorData"
@@ -117,7 +118,7 @@ const updateLineNumbers = () => {
   }
 }
 
-// 使用 ResizeObserver 监听编辑器内容区域的大小变化
+// 使用 ResizeObserver 监听编辑器内容区域的���小变化
 const setupResizeObserver = (editorElement: Element) => {
   const resizeObserver = new ResizeObserver(() => {
     updateLineNumbersDebounced()
@@ -199,7 +200,7 @@ const onEditorReady = (editor: Editor) => {
 
     editorContent.addEventListener('scroll', handleScroll, { passive: true })
 
-    // 保存清理函数，在组件销毁时调用
+    // ����存清理函数，在组件销毁时调用
     onBeforeUnmount(() => {
       editorContent.removeEventListener('scroll', handleScroll)
       if (updateTimeout) {
@@ -242,7 +243,7 @@ const highlightCurrentLine = () => {
     const blocks = Array.from(editorElement.children)
     let currentLine = 0
 
-    // 遍历块级元素直到找到包含光标的元素
+    // 遍历块级元素直到找到���含光标的元素
     for (const block of blocks) {
       if (block.contains(domPosition.parent) || block === domPosition.parent) {
         // 找到包含光标的块级元素
@@ -265,6 +266,13 @@ const highlightCurrentLine = () => {
         const relativeTop = cursorTop - editorRect.top
         const lineHeight = 21 // 固定行高
         currentLine = Math.floor(relativeTop / lineHeight) + 1
+
+        // 更新高亮元素位置
+        const highlightElement = document.querySelector('.line-highlight')
+        if (highlightElement) {
+          highlightElement.style.top = `${Math.floor(relativeTop / lineHeight) * lineHeight}px`
+          highlightElement.classList.add('active')
+        }
         break
       } else {
         // 累加之前块级元素的行数
@@ -333,6 +341,9 @@ onBeforeUnmount(() => {
   height: 100%;
   overflow: auto !important;
 }
+.current-line{
+  position: relative;
+}
 </style>
 
 <style scoped>
@@ -371,7 +382,7 @@ onBeforeUnmount(() => {
   text-align: right;
   overflow-y: auto;
   position: relative;
-  z-index: 2;
+  z-index: 1;
   display: flex;
   flex-direction: column;
 }
@@ -386,91 +397,97 @@ onBeforeUnmount(() => {
   transition: color 0.1s ease;
 }
 
-/* 添加全宽高亮元素 */
-.line-number::after {
-  content: '';
-  position: fixed;
-  left: 0;
+
+
+/* 新的高亮元素样式 */
+.line-highlight {
+  position: absolute;
+  left: -66px; /* 50px宽度 + 16px padding */
   right: 0;
   height: 21px;
-  background-color: transparent;
+  background-color: rgb(207, 232, 255);
   pointer-events: none;
-  z-index: 1;
-  transition: background-color 0.1s ease;
+  z-index: 9999;
+  display: none;
 }
 
-.line-number.current-line::after {
-  background-color: rgba(66, 139, 202, 0.1);
+.line-highlight.active {
+  display: block;
 }
 
-/* 确保编辑器内容在最上层 */
-.editor-wrapper {
-  flex: 1;
-  height: 100%;
+/* 确保行号文字在高亮层之上 */
+.line-number {
   position: relative;
-  z-index: 2;
+  z-index: 10000;
+  color: inherit;
 }
 
-/* 移除原有的行号高亮背景色 */
 .line-number.current-line {
   color: #428bca;
   font-weight: 600;
-  background-color: transparent;
 }
 
-/* 确保编辑器内容可以正常交互 */
-:deep(.ck-editor__editable) {
-  position: relative;
-  z-index: 2;
-}
-
-/* CKEditor 样式覆盖 */
-:deep(.ck-editor__editable) {
-  padding: 0 !important;
-  line-height: 21px !important;
-  height: 100% !important;
-  min-height: unset !important;
-  max-height: none !important;
-  position: relative !important;
-}
-
-:deep(.ck-content) {
+/* 编辑器容器样式 */
+.editor-container {
+  flex: 1;
+  border: none;
+  background: #fff;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  width: 100%;
   height: 100%;
-  width: 100% !important;
-  border: none !important;
-  padding: 0 !important;
-  line-height: 21px !important;
-  margin: 0 !important;
-  position: relative !important;
-}
-
-:deep(.ck-content p) {
-  margin: 0 !important;
-  padding: 0 !important;
-  min-height: 21px !important;
-  line-height: 21px !important;
-  position: relative !important;
-  transition: all 0.1s ease !important;
+  position: relative;
 }
 
 .editor-wrapper {
   flex: 1;
   height: 100%;
+  position: relative;
+  z-index: 1;
+  overflow: hidden; /* 确保高亮不会超出容器 */
 }
 
-/* 当前行高亮样式 */
+/* 行号容器样式 */
+.line-numbers {
+  width: 50px;
+  min-width: 50px;
+  background: #f5f5f5;
+  border-right: 1px solid #e8e8e8;
+  padding: 0 0.5rem;
+  font-family: monospace;
+  font-size: 12px;
+  color: #999;
+  user-select: none;
+  text-align: right;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 编辑器内容区域样式 */
+:deep(.ck-editor__editable) {
+  position: relative;
+  z-index: 1;
+}
+
+/* 移除其他不需要的样式 */
+:deep(.current-line-highlight),
 :deep(.ck-content .current-line) {
-  background-color: rgba(66, 139, 202, 0.15) !important;
-  position: relative !important;
-  box-shadow: inset 0 0 0 1px rgba(66, 139, 202, 0.1) !important;
-  padding: 0 !important;
-  z-index: 1 !important;
-  margin: 0 !important;
+  display: none !important;
 }
 
-/* 移除之前的 before 伪元素样式 */
-:deep(.ck-content .current-line::before) {
-  display: none !important;
+/* 确保编辑器内容在高亮层下方 */
+:deep(.ck-editor__editable) {
+  position: relative;
+  z-index: 1;
+}
+
+:deep(.ck-content) {
+  position: relative;
+  z-index: 1;
 }
 
 /* 编辑器主体样式 */
@@ -480,6 +497,30 @@ onBeforeUnmount(() => {
   padding: 0 !important;
   display: flex !important;
   flex-direction: column !important;
+  position: relative;
+  z-index: 1;
+}
+
+.editor-wrapper {
+  flex: 1;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+/* 当前行高亮样式 */
+:deep(.ck-content .current-line) {
+  background-color: rgb(207, 232, 255) !important;
+  position: relative !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  z-index: 1 !important;
+  margin: 0 !important;
+}
+
+/* 移除之前的 before 伪元素样式 */
+:deep(.ck-content .current-line::before) {
+  display: none !important;
 }
 
 /* 确保内容区域正确显示 */
@@ -617,7 +658,7 @@ onBeforeUnmount(() => {
   box-shadow: none !important;
 }
 
-/* 移除工具栏按钮的聚焦边框 */
+/* 移除工具栏按钮的焦边框 */
 :deep(.ck.ck-button:focus),
 :deep(.ck.ck-button.ck-on:focus) {
   border: none !important;
@@ -651,5 +692,26 @@ onBeforeUnmount(() => {
 .line-numbers {
   overflow-y: hidden;
   overflow-x: hidden;
+}
+
+/* 移除之前的编辑器内容高亮样式 */
+:deep(.ck-content .current-line) {
+  background-color: transparent !important;
+}
+
+/* 确保编辑器内容区域可以正确显示高亮 */
+:deep(.ck-editor__editable) {
+  position: relative !important;
+}
+
+/* 编辑器高亮层样式 */
+:deep(.line-highlight) {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 21px;
+  background-color: rgb(207, 232, 255);
+  pointer-events: none;
+  z-index: 10000;
 }
 </style>
