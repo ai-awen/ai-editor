@@ -150,6 +150,7 @@ const onEditorReady = (editor: Editor) => {
 .editor-wrapper {
   flex: 1;
   height: 100%;
+  overflow: hidden;
 }
 </style>
 
