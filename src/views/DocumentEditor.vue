@@ -356,7 +356,6 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   position: relative;
-  overflow: hidden;
 }
 
 .line-numbers {
@@ -372,7 +371,7 @@ onBeforeUnmount(() => {
   text-align: right;
   overflow-y: auto;
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   flex-direction: column;
 }
@@ -388,46 +387,41 @@ onBeforeUnmount(() => {
 }
 
 /* 添加全宽高亮元素 */
-.line-number::before {
+.line-number::after {
   content: '';
-  position: absolute;
-  left: -50px; /* 确保覆盖整个行号区域 */
-  right: -3000px; /* 延伸到编辑器区域 */
-  height: 100%;
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 21px;
   background-color: transparent;
-  pointer-events: none; /* 确保不影响编辑器操作 */
-  z-index: 0; /* 置于底层 */
+  pointer-events: none;
+  z-index: 1;
   transition: background-color 0.1s ease;
 }
 
-.line-number.current-line::before {
-  background-color: rgba(66, 139, 202, 0.1); /* 淡蓝色背景 */
+.line-number.current-line::after {
+  background-color: rgba(66, 139, 202, 0.1);
 }
 
-/* 确保行号文字在高亮层之上 */
-.line-number {
-  position: relative;
-  z-index: 1;
-}
-
-/* 调整编辑器容器样式以支持高亮效果 */
-.editor-container {
-  position: relative;
-  overflow: hidden;
-}
-
-/* 确保编辑器内容在高亮层之上 */
+/* 确保编辑器内容在最上层 */
 .editor-wrapper {
+  flex: 1;
+  height: 100%;
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 /* 移除原有的行号高亮背景色 */
 .line-number.current-line {
   color: #428bca;
   font-weight: 600;
-  /* 移除原有的背景色 */
   background-color: transparent;
+}
+
+/* 确保编辑器内容可以正常交互 */
+:deep(.ck-editor__editable) {
+  position: relative;
+  z-index: 2;
 }
 
 /* CKEditor 样式覆盖 */
