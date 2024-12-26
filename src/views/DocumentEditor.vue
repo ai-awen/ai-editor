@@ -16,7 +16,6 @@
           v-model="editorData"
           :config="editorConfig"
           @ready="onEditorReady"
-          @input="onEditorChange"
         ></ckeditor>
       </div>
     </div>
@@ -109,13 +108,16 @@ const updateLineNumbersDebounced = () => {
   }
   updateTimeout = window.setTimeout(() => {
     updateLineNumbers()
-  }, 100)
+  }, 16) // 降低到一帧的时间（约16.7ms）
 }
 
 // 编辑器就绪事件处理
 const onEditorReady = (editor: Editor) => {
   editorInstance.value = editor
   updateLineNumbers()
+
+  // 直接监听编辑器的 change 事件
+  editor.model.document.on('change:data', updateLineNumbersDebounced)
 
   // 监听编辑器的滚动事件
   const editorContent = document.querySelector('.ck-editor__editable')
@@ -133,13 +135,10 @@ const onEditorReady = (editor: Editor) => {
       if (updateTimeout) {
         window.clearTimeout(updateTimeout)
       }
+      // 移除 change 事件监听
+      editor.model.document.off('change:data', updateLineNumbersDebounced)
     })
   }
-}
-
-// 编辑器内容变化事件处理
-const onEditorChange = () => {
-  updateLineNumbersDebounced()
 }
 </script>
 
