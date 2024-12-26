@@ -150,10 +150,16 @@ const onEditorReady = (editor: Editor) => {
   // 等待 DOM 更新后再初始化
   requestAnimationFrame(() => {
     const editorElement = document.querySelector('.ck-editor__editable')
-    if (editorElement) {
+    const lineNumbers = document.querySelector('.line-numbers')
+    if (editorElement && lineNumbers) {
       updateLineNumbers()
-      setupResizeObserver(editorElement)
       
+      // 监听编辑器滚动
+      editorElement.addEventListener('scroll', () => {
+        // 同步行号容器的滚动位置
+        lineNumbers.scrollTop = editorElement.scrollTop
+      }, { passive: true })
+
       // 自动获取焦点并触发高亮
       editor.editing.view.focus()
       highlightCurrentLine()
@@ -189,27 +195,14 @@ const onEditorReady = (editor: Editor) => {
     })
   })
 
-  // 监听编辑器的滚动事件
-  const editorContent = document.querySelector('.ck-editor__editable')
-  const lineNumbers = document.querySelector('.line-numbers')
-  if (editorContent && lineNumbers) {
-    const handleScroll = () => {
-      lineNumbers.scrollTop = editorContent.scrollTop
-      requestAnimationFrame(highlightCurrentLine)
+  // 组件销毁时清理
+  onBeforeUnmount(() => {
+    const editorElement = document.querySelector('.ck-editor__editable')
+    if (editorElement) {
+      editorElement.removeEventListener('scroll', () => {})
     }
-
-    editorContent.addEventListener('scroll', handleScroll, { passive: true })
-
-    // ��������������存清理函数，在组件销毁时调用
-    onBeforeUnmount(() => {
-      editorContent.removeEventListener('scroll', handleScroll)
-      if (updateTimeout) {
-        window.clearTimeout(updateTimeout)
-      }
-      // 移除事件监听
-      editor.model.document.off('change:data', handleChange)
-    })
-  }
+    editor.model.document.off('change:data', handleChange)
+  })
 }
 
 // 高亮当前行
@@ -345,11 +338,8 @@ onBeforeUnmount(() => {
 .editor-wrapper {
   flex: 1;
   height: 100%;
-  overflow: auto !important;
 }
-.current-line{
-  position: relative;
-}
+
 </style>
 
 <style scoped>
@@ -386,11 +376,9 @@ onBeforeUnmount(() => {
   color: #999;
   user-select: none;
   text-align: right;
-  overflow-y: auto;
+  overflow: hidden;
   position: relative;
   z-index: 1;
-  display: flex;
-  flex-direction: column;
 }
 
 .line-number {
@@ -399,11 +387,54 @@ onBeforeUnmount(() => {
   line-height: 21px;
   white-space: nowrap;
   display: block;
-  position: relative;
-  transition: color 0.1s ease;
 }
 
+.editor-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
 
+:deep(.ck.ck-editor) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.ck.ck-editor__main) {
+  flex: 1;
+  overflow: hidden;
+}
+
+:deep(.ck-editor__editable) {
+  height: 100%;
+  overflow: auto !important;
+  padding: 0 !important;
+}
+
+:deep(.ck-content) {
+  min-height: 100%;
+  padding: 0 !important;
+}
+
+:deep(.ck-content > *) {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 21px;
+  line-height: 21px;
+}
+
+/* 移除滚动条样式 */
+:deep(.ck-editor__editable::-webkit-scrollbar) {
+  width: 0;
+  height: 0;
+}
+
+/* 确保编辑器内容和行号对齐 */
+:deep(.ck-content) {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
 
 /* 新的高亮元素样式 */
 .line-highlight {
