@@ -39,6 +39,9 @@ const editorConfig = {
   language: 'zh-cn',
   toolbar: {
     items: [
+      'undo',
+      'redo',
+      '|',
       'heading',
       '|',
       'bold',
@@ -51,10 +54,14 @@ const editorConfig = {
       'indent',
       '|',
       'blockQuote',
-      'insertTable',
-      'undo',
-      'redo'
+      'insertTable'
     ]
+  },
+  // 禁用底部工具栏
+  ui: {
+    viewportOffset: {
+      bottom: 0
+    }
   },
   // 添加自定义样式配置
   style: {
@@ -96,7 +103,7 @@ const updateLineNumbers = () => {
       totalLines += paragraphLines
     })
 
-    // 如果没有内容，至少显示一行
+    // 如果没有内容���少显示一行
     totalLines = Math.max(1, totalLines)
     
     // 更新行号
@@ -203,7 +210,7 @@ const highlightCurrentLine = () => {
 
   try {
     // 移除之前的高亮
-    const prevHighlights = document.querySelectorAll('.ck-content .current-line')
+    const prevHighlights = document.querySelectorAll('.line-number.current-line')
     prevHighlights.forEach(element => {
       element.classList.remove('current-line')
     })
@@ -219,6 +226,8 @@ const highlightCurrentLine = () => {
     if (!range.collapsed) return
 
     const currentNode = range.startContainer
+    const editorElement = document.querySelector('.ck-editor__editable')
+    if (!editorElement) return
 
     // 查找当前段落
     const currentParagraph = currentNode instanceof Element 
@@ -226,8 +235,35 @@ const highlightCurrentLine = () => {
       : currentNode.parentElement?.closest('p')
 
     if (currentParagraph) {
-      // 添加高亮类
-      currentParagraph.classList.add('current-line')
+      // 计算当前段落之前的所有段落的行数
+      const paragraphs = Array.from(editorElement.querySelectorAll('p'))
+      let currentLine = 0
+
+      for (let i = 0; i < paragraphs.length; i++) {
+        const paragraph = paragraphs[i]
+        if (paragraph === currentParagraph) {
+          // 找到当前段落，计算光标在段落内的行偏移
+          const computedStyle = window.getComputedStyle(paragraph)
+          const lineHeight = parseFloat(computedStyle.lineHeight)
+          const cursorTop = range.getBoundingClientRect().top
+          const paragraphTop = paragraph.getBoundingClientRect().top
+          const lineOffset = Math.floor((cursorTop - paragraphTop) / lineHeight)
+          currentLine += lineOffset + 1
+          break
+        } else {
+          // 累加之前段落的行数
+          const computedStyle = window.getComputedStyle(paragraph)
+          const paragraphHeight = paragraph.offsetHeight
+          const lineHeight = parseFloat(computedStyle.lineHeight)
+          currentLine += Math.ceil(paragraphHeight / lineHeight)
+        }
+      }
+
+      // 高亮对应的行号
+      const lineNumbers = document.querySelectorAll('.line-number')
+      if (currentLine > 0 && currentLine <= lineNumbers.length) {
+        lineNumbers[currentLine - 1].classList.add('current-line')
+      }
     }
   } catch (error) {
     console.error('Error highlighting current line:', error)
@@ -242,15 +278,6 @@ style.textContent = `
   padding: 0;
   min-height: 21px;
   line-height: 21px;
-  transition: background-color 0.15s ease;
-}
-
-.ck-content .current-line {
-  background-color: rgba(66, 139, 202, 0.15) !important;
-  box-shadow: inset 0 0 0 1px rgba(66, 139, 202, 0.1);
-  padding: 0;
-  position: relative;
-  z-index: 1;
 }
 `
 document.head.appendChild(style)
@@ -262,23 +289,6 @@ const editorStyle = {
     padding: '0 8px',
     minHeight: '21px',
     lineHeight: '21px'
-  },
-  '.ck-content .current-line': {
-    backgroundColor: 'rgba(66, 139, 202, 0.15)',
-    boxShadow: 'inset 0 0 0 1px rgba(66, 139, 202, 0.1)',
-    margin: '0 -8px',
-    padding: '0 8px',
-    position: 'relative'
-  },
-  '.ck-content .current-line::before': {
-    content: '""',
-    position: 'absolute',
-    left: '0',
-    top: '0',
-    bottom: '0',
-    width: '3px',
-    backgroundColor: '#428bca',
-    opacity: '1'
   }
 }
 
@@ -296,7 +306,7 @@ onBeforeUnmount(() => {
 .editor-wrapper {
   flex: 1;
   height: 100%;
-  overflow: hidden;
+  overflow: auto !important;
 }
 </style>
 
@@ -346,6 +356,14 @@ onBeforeUnmount(() => {
   line-height: 21px;
   white-space: nowrap;
   display: block;
+  position: relative;
+  transition: color 0.1s ease;
+}
+
+.line-number.current-line {
+  color: #428bca;
+  font-weight: 600;
+  background-color: rgba(66, 139, 202, 0.1);
 }
 
 /* CKEditor 样式覆盖 */
@@ -355,7 +373,6 @@ onBeforeUnmount(() => {
   height: 100% !important;
   min-height: unset !important;
   max-height: none !important;
-  overflow-y: auto !important;
   position: relative !important;
 }
 
@@ -365,7 +382,6 @@ onBeforeUnmount(() => {
   border: none !important;
   padding: 0 !important;
   line-height: 21px !important;
-  max-width: none !important;
   margin: 0 !important;
   position: relative !important;
 }
@@ -377,9 +393,11 @@ onBeforeUnmount(() => {
   line-height: 21px !important;
   position: relative !important;
   transition: all 0.1s ease !important;
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  word-break: break-all !important;
+}
+
+.editor-wrapper {
+  flex: 1;
+  height: 100%;
 }
 
 /* 当前行高亮样式 */
@@ -389,6 +407,7 @@ onBeforeUnmount(() => {
   box-shadow: inset 0 0 0 1px rgba(66, 139, 202, 0.1) !important;
   padding: 0 !important;
   z-index: 1 !important;
+  margin: 0 !important;
 }
 
 /* 移除之前的 before 伪元素样式 */
@@ -563,7 +582,7 @@ onBeforeUnmount(() => {
   box-shadow: none !important;
 }
 
-/* 确保行号和编辑器内容对齐 */
+/* 确保行号和编辑器内对齐 */
 :deep(.ck-content) {
   padding: 0 !important;
   line-height: 21px !important;
