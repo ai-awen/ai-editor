@@ -10,102 +10,151 @@
           {{ n }}
         </div>
       </div>
-      <div id="editor"></div>
+      <div class="editor-wrapper">
+        <ckeditor
+          :editor="editor"
+          v-model="editorData"
+          :config="editorConfig"
+          @ready="onEditorReady"
+          @input="onEditorChange"
+        ></ckeditor>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { createEditor } from './ckeditor'
-import { DecoupledEditor } from '@ckeditor/ckeditor5-editor-decoupled'
-const editor = ref<DecoupledEditor>()
-const editorData = ref('')
+import { DecoupledEditor } from './ckeditor'
+import { CKEditor } from '@ckeditor/ckeditor5-vue'
+import type { Editor } from '@ckeditor/ckeditor5-core'
 
-// 添加行号状态管理
-const lineCount = ref(1) // 默认显示1行
+const editor = ref(DecoupledEditor)
+const editorInstance = ref<Editor | null>(null)
+const editorData = ref('')
+const lineCount = ref(1)
+
+// 编辑器配置
+const editorConfig = {
+  placeholder: '请输入内容...',
+  language: 'zh-cn',
+  toolbar: {
+    items: [
+      'heading',
+      '|',
+      'bold',
+      'italic',
+      'link',
+      'bulletedList',
+      'numberedList',
+      '|',
+      'outdent',
+      'indent',
+      '|',
+      'blockQuote',
+      'insertTable',
+      'undo',
+      'redo'
+    ]
+  }
+}
 
 // 更新行号
 const updateLineNumbers = () => {
-  if (!editor.value) return
+  if (!editorInstance.value) return
 
-  // 获取编辑器内容
-  const content = editor.value.getData()
-  
-  // 计算实际的行数
-  // 1. 移除所有HTML标签，保留文本内容
-  const plainText = content.replace(/<[^>]+>/g, '\n')
-  
-  // 2. 计算实际的换行数
-  const lines = plainText
-    .split('\n')
-    .filter(line => line.trim() !== '') // 过滤空行
-    .length
-  
-  // 3. 如果内容为空或只有一个空段落，则显示1行
-  lineCount.value = content === '' || content === '<p><br></p>' 
-    ? 1 
-    : Math.max(lines, 1)
-}
+  const rootElement = (editorInstance.value as any).model.document.getRoot()
+  if (!rootElement) return
 
-onMounted(async () => {
   try {
-    const editorElement = document.querySelector('#editor')
-    if (!editorElement) {
-      throw new Error('Editor element not found')
-    }
+    // 计算实际的行数
+    const paragraphs = Array.from(rootElement.getChildren())
+    let actualLines = 0
 
-    editor.value = await createEditor(editorElement as HTMLElement)
-    
-    // 设置编辑器初始内容
-    editor.value.setData('<p><br></p>')
+    // 遍历段落计算行数
+    paragraphs.forEach((paragraph: any) => {
+      if (paragraph.is('element', 'paragraph')) {
+        // 计算段落中的软换行数
+        const children = Array.from(paragraph.getChildren())
+        const softBreaks = children.filter((child: any) => 
+          child.is('element', 'softBreak')
+        ).length
 
-    // 初始化行号为1
-    lineCount.value = 1
-
-    // 监听内容变化
-    editor.value.model.document.on('change:data', () => {
-      if (editor.value) {
-        editorData.value = editor.value.getData()
-        updateLineNumbers()
+        // 每个段落至少算一行
+        actualLines += 1 + Math.max(0, softBreaks)
       }
     })
 
-    // 添加滚动同步
-    const editorContent = document.querySelector('.ck-editor__editable')
-    const lineNumbers = document.querySelector('.line-numbers')
-    if (editorContent && lineNumbers) {
-      editorContent.addEventListener('scroll', () => {
-        lineNumbers.scrollTop = editorContent.scrollTop
-      })
+    // 添加安全检查，确保行数是有效的正整数
+    const safeLineCount = Math.max(1, Math.min(actualLines, 9999))
+    
+    // 只有当行数是有效的正整数时才更新
+    if (Number.isInteger(safeLineCount) && safeLineCount > 0) {
+      lineCount.value = safeLineCount
+    } else {
+      lineCount.value = 1 // 默认显示一行
     }
 
   } catch (error) {
-    console.error('编辑器初始化失败:', error)
+    console.error('Error calculating line numbers:', error)
+    lineCount.value = 1 // 出错时显示一行
   }
-})
+}
 
-// 组件销毁时清理
-onBeforeUnmount(() => {
-  if (editor.value) {
-    editor.value.destroy()
+// 使用防抖函数来避免频繁更新
+let updateTimeout: number | null = null
+const updateLineNumbersDebounced = () => {
+  if (updateTimeout) {
+    window.clearTimeout(updateTimeout)
   }
-})
+  updateTimeout = window.setTimeout(() => {
+    updateLineNumbers()
+  }, 100)
+}
+
+// 编辑器就绪事件处理
+const onEditorReady = (editor: Editor) => {
+  editorInstance.value = editor
+  updateLineNumbers()
+
+  // 监听编辑器的滚动事件
+  const editorContent = document.querySelector('.ck-editor__editable')
+  const lineNumbers = document.querySelector('.line-numbers')
+  if (editorContent && lineNumbers) {
+    const handleScroll = () => {
+      lineNumbers.scrollTop = editorContent.scrollTop
+    }
+
+    editorContent.addEventListener('scroll', handleScroll, { passive: true })
+
+    // 保存清理函数，在组件销毁时调用
+    onBeforeUnmount(() => {
+      editorContent.removeEventListener('scroll', handleScroll)
+      if (updateTimeout) {
+        window.clearTimeout(updateTimeout)
+      }
+    })
+  }
+}
+
+// 编辑器内容变化事件处理
+const onEditorChange = () => {
+  updateLineNumbersDebounced()
+}
 </script>
 
 <style>
-.document-editor{
+.document-editor {
   overflow: hidden;
+}
+
+.editor-wrapper {
+  flex: 1;
+  height: 100%;
 }
 </style>
 
 <style scoped>
-#editor{
-  padding: 0 !important;
-  margin: 0 !important;
-  border: none !important;
-}
-
 .document-editor {
   height: 100vh;
   width: 100%;
@@ -153,58 +202,10 @@ onBeforeUnmount(() => {
   display: block;
 }
 
-#editor {
-  flex: 1;
-  height: 100%;
-  overflow: auto;
-}
-
-/* 确保编辑器内容和行号对齐 */
+/* CKEditor 样式覆盖 */
 :deep(.ck-editor__editable) {
   padding: 0 1rem !important;
   line-height: 21px !important;
-}
-
-:deep(.ck-content) {
-  padding: 0 2rem !important;
-  line-height: 21px !important;
-  min-height: 100% !important;
-  margin: 0 !important;
-}
-
-:deep(.ck-content p) {
-  margin: 0 !important;
-  padding: 0 !important;
-  min-height: 21px !important;
-  line-height: 21px !important;
-}
-
-/* 移除重复的样式 */
-.editor-container {
-  flex: 1;
-  border: none;
-  background: #fff;
-  overflow: hidden;
-  display: flex;
-  flex-direction: row;
-  width: 100%;
-  height: 100%;
-}
-
-#editor {
-  flex: 1;
-  height: 100%;
-  overflow: auto;
-}
-
-/* 移除编辑器容器的内边距 */
-:deep(.ck-editor__main) {
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* 移除重复的样式声明 */
-:deep(.ck-editor__editable) {
   height: 100% !important;
   min-height: unset !important;
   max-height: none !important;
@@ -216,9 +217,24 @@ onBeforeUnmount(() => {
   width: 100% !important;
   border: none !important;
   padding: 1.5rem 2rem !important;
-  line-height: 21px !important; /* 固定行高 */
+  line-height: 21px !important;
   max-width: none !important;
   margin: 0 !important;
+}
+
+:deep(.ck-content p) {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 21px !important;
+  line-height: 21px !important;
+}
+
+:deep(.ck-editor__main) {
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 :deep(.ck-balloon-panel) {
@@ -227,7 +243,7 @@ onBeforeUnmount(() => {
 
 :deep(.ck-editor__editable:not(.ck-editor__nested-editable)) {
   border: none !important;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: none !important;
 }
 
 :deep(.ck-editor__editable::-webkit-scrollbar) {
@@ -254,33 +270,6 @@ onBeforeUnmount(() => {
   padding: 8px 16px !important;
 }
 
-:deep(.ck-editor__editable > .ck-content) {
-  max-width: 900px;
-  margin: 0 auto;
-}
-
-/* 移除 CKEditor 默认边框和背景 */
-:deep(.ck.ck-editor__main) {
-  height: 100%;
-  width: 100%;
-  border: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-:deep(.ck.ck-editor__editable) {
-  border: none !important;
-  box-shadow: none !important;
-  background: transparent !important;
-  width: 100% !important;
-  max-width: none !important;
-}
-
-:deep(.ck.ck-toolbar) {
-  border: none !important;
-  background: transparent !important;
-}
-
 :deep(.ck.ck-toolbar__items) {
   background: transparent !important;
 }
@@ -302,28 +291,18 @@ onBeforeUnmount(() => {
   background: rgba(0, 0, 0, 0.15) !important;
 }
 
-/* 移除分割线边框 */
 :deep(.ck.ck-toolbar__separator) {
   background: rgba(0, 0, 0, 0.1);
 }
 
-/* 移除下拉菜单边框 */
 :deep(.ck.ck-dropdown__panel) {
   border: none !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
 }
 
-/* 移除气泡工具栏边框 */
 :deep(.ck.ck-balloon-panel) {
   border: none !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
-}
-
-/* 优化编辑区域 */
-:deep(.ck-content) {
-  padding: 2rem !important;
-  max-width: 800px !important;
-  margin: 0 auto !important;
 }
 
 /* 移除所有聚焦状态的边框和阴影 */
@@ -345,12 +324,6 @@ onBeforeUnmount(() => {
   box-shadow: none !important;
 }
 
-/* 移除编辑器容器的内阴影 */
-:deep(.ck-editor__editable:not(.ck-editor__nested-editable)) {
-  border: none !important;
-  box-shadow: none !important;
-}
-
 /* 移除工具栏按钮的聚焦边框 */
 :deep(.ck.ck-button:focus),
 :deep(.ck.ck-button.ck-on:focus) {
@@ -359,7 +332,7 @@ onBeforeUnmount(() => {
   box-shadow: none !important;
 }
 
-/* 移除下拉菜单的聚焦边框 */
+/* 移除下拉��单的聚焦边框 */
 :deep(.ck.ck-dropdown__button:focus) {
   border: none !important;
   outline: none !important;
@@ -385,42 +358,5 @@ onBeforeUnmount(() => {
 .line-numbers {
   overflow-y: hidden;
   overflow-x: hidden;
-}
-
-/* 确保编辑器内容和行号对齐 */
-:deep(.ck-editor__editable) {
-  padding: 1.5rem 0 !important;
-}
-
-:deep(.ck-content) {
-  padding: 0 2rem !important;
-  line-height: 21px !important;
-  min-height: 100% !important;
-}
-
-/* 移除可能影响布局的样式 */
-:deep(.ck-editor__main) {
-  height: 100% !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-:deep(.ck-editor__editable) {
-  flex: 1 !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-/* 确保行号和编辑器内容对齐 */
-:deep(.ck-editor__editable) {
-  padding-top: 1.5rem !important;
-  line-height: 21px !important;
-}
-
-/* 确保内容区域和行号对齐 */
-:deep(.ck-content p) {
-  margin: 0;
-  min-height: 21px;
-  line-height: 21px !important;
 }
 </style>
