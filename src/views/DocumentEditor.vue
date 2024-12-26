@@ -55,6 +55,19 @@ const editorConfig = {
       'undo',
       'redo'
     ]
+  },
+  // 添加自定义样式配置
+  style: {
+    definitions: [
+      {
+        name: 'paragraph',
+        element: 'p',
+        styles: {
+          padding: '0',
+          margin: '0'
+        }
+      }
+    ]
   }
 }
 
@@ -125,16 +138,35 @@ const onEditorReady = (editor: Editor) => {
   editorInstance.value = editor
   
   // 等待 DOM 更新后再初始化
-  setTimeout(() => {
+  requestAnimationFrame(() => {
     const editorElement = document.querySelector('.ck-editor__editable')
     if (editorElement) {
       updateLineNumbers()
       setupResizeObserver(editorElement)
+      
+      // 初始化时高亮第一行
+      highlightCurrentLine()
     }
-  }, 0)
+  })
 
-  // 直接监听编辑器的 change 事件
-  editor.model.document.on('change:data', updateLineNumbersDebounced)
+  // 监听编辑器事件
+  const handleChange = () => {
+    updateLineNumbersDebounced()
+    requestAnimationFrame(highlightCurrentLine)
+  }
+
+  // 监听内容变化
+  editor.model.document.on('change:data', handleChange)
+
+  // 监听光标位置变化
+  editor.editing.view.document.on('selectionChange', () => {
+    requestAnimationFrame(highlightCurrentLine)
+  })
+
+  // 监听回车键
+  editor.editing.view.document.on('enter', () => {
+    requestAnimationFrame(highlightCurrentLine)
+  })
 
   // 监听编辑器的滚动事件
   const editorContent = document.querySelector('.ck-editor__editable')
@@ -142,6 +174,7 @@ const onEditorReady = (editor: Editor) => {
   if (editorContent && lineNumbers) {
     const handleScroll = () => {
       lineNumbers.scrollTop = editorContent.scrollTop
+      requestAnimationFrame(highlightCurrentLine)
     }
 
     editorContent.addEventListener('scroll', handleScroll, { passive: true })
@@ -152,11 +185,108 @@ const onEditorReady = (editor: Editor) => {
       if (updateTimeout) {
         window.clearTimeout(updateTimeout)
       }
-      // 移除 change 事件监听
-      editor.model.document.off('change:data', updateLineNumbersDebounced)
+      // 移除事件监听
+      editor.model.document.off('change:data', handleChange)
     })
   }
 }
+
+// 高亮当前行
+const highlightCurrentLine = () => {
+  if (!editorInstance.value) return
+
+  try {
+    // 移除之前的高亮
+    const prevHighlights = document.querySelectorAll('.ck-content .current-line')
+    prevHighlights.forEach(element => {
+      element.classList.remove('current-line')
+    })
+
+    // 获取当前选区
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+
+    // 获取当前选区的范围
+    const range = selection.getRangeAt(0)
+    const currentNode = range.startContainer
+
+    // 查找当前段落
+    const currentParagraph = currentNode instanceof Element 
+      ? currentNode.closest('p') 
+      : currentNode.parentElement?.closest('p')
+
+    if (currentParagraph) {
+      // 添加高亮类
+      currentParagraph.classList.add('current-line')
+
+      // 确保高亮元素在视图中可见
+      const editorElement = document.querySelector('.ck-editor__editable')
+      if (editorElement) {
+        const editorRect = editorElement.getBoundingClientRect()
+        const elementRect = currentParagraph.getBoundingClientRect()
+        
+        if (elementRect.top < editorRect.top || elementRect.bottom > editorRect.bottom) {
+          currentParagraph.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error highlighting current line:', error)
+  }
+}
+
+// 更新样式
+const style = document.createElement('style')
+style.textContent = `
+.ck-content p {
+  position: relative;
+  padding: 0;
+  min-height: 21px;
+  line-height: 21px;
+  transition: background-color 0.15s ease;
+}
+
+.ck-content .current-line {
+  background-color: rgba(66, 139, 202, 0.15) !important;
+  box-shadow: inset 0 0 0 1px rgba(66, 139, 202, 0.1);
+  padding: 0;
+  position: relative;
+  z-index: 1;
+}
+`
+document.head.appendChild(style)
+
+// 编辑器样式
+const editorStyle = {
+  '.ck-content p': {
+    position: 'relative',
+    padding: '0 8px',
+    minHeight: '21px',
+    lineHeight: '21px'
+  },
+  '.ck-content .current-line': {
+    backgroundColor: 'rgba(66, 139, 202, 0.15)',
+    boxShadow: 'inset 0 0 0 1px rgba(66, 139, 202, 0.1)',
+    margin: '0 -8px',
+    padding: '0 8px',
+    position: 'relative'
+  },
+  '.ck-content .current-line::before': {
+    content: '""',
+    position: 'absolute',
+    left: '0',
+    top: '0',
+    bottom: '0',
+    width: '3px',
+    backgroundColor: '#428bca',
+    opacity: '1'
+  }
+}
+
+onBeforeUnmount(() => {
+  // 移除添加的样式
+  document.head.removeChild(style)
+})
 </script>
 
 <style>
@@ -227,6 +357,7 @@ const onEditorReady = (editor: Editor) => {
   min-height: unset !important;
   max-height: none !important;
   overflow-y: auto !important;
+  position: relative !important;
 }
 
 :deep(.ck-content) {
@@ -237,6 +368,7 @@ const onEditorReady = (editor: Editor) => {
   line-height: 21px !important;
   max-width: none !important;
   margin: 0 !important;
+  position: relative !important;
 }
 
 :deep(.ck-content p) {
@@ -244,6 +376,73 @@ const onEditorReady = (editor: Editor) => {
   padding: 0 !important;
   min-height: 21px !important;
   line-height: 21px !important;
+  position: relative !important;
+  transition: all 0.1s ease !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  word-break: break-all !important;
+}
+
+/* 当前行高亮样式 */
+:deep(.ck-content .current-line) {
+  background-color: rgba(66, 139, 202, 0.15) !important;
+  position: relative !important;
+  box-shadow: inset 0 0 0 1px rgba(66, 139, 202, 0.1) !important;
+  padding: 0 !important;
+  z-index: 1 !important;
+}
+
+/* 移除之前的 before 伪元素样式 */
+:deep(.ck-content .current-line::before) {
+  display: none !important;
+}
+
+/* 编辑器主体样式 */
+:deep(.ck-editor__main) {
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* 确保内容区域正确显示 */
+:deep(.ck.ck-editor__editable_inline) {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: 100% !important;
+}
+
+/* 移除工具栏的边距 */
+:deep(.ck-toolbar) {
+  padding: 4px 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+/* 行号高亮 */
+.line-numbers {
+  position: relative;
+}
+
+.line-number {
+  padding: 0 4px;
+  height: 21px;
+  line-height: 21px;
+  white-space: nowrap;
+  display: block;
+  position: relative;
+  transition: color 0.1s ease;
+}
+
+/* 当前行号高亮 */
+:deep(.ck-content .current-line) ~ .line-numbers .line-number {
+  color: #428bca;
+  font-weight: 600;
 }
 
 :deep(.ck-editor__main) {
@@ -323,7 +522,7 @@ const onEditorReady = (editor: Editor) => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
 }
 
-/* 移除所有聚���状态的边框和阴影 */
+/* 移除所有聚状态的边框和阴影 */
 :deep(.ck.ck-editor__editable.ck-focused),
 :deep(.ck.ck-editor__editable:focus),
 :deep(.ck.ck-editor__editable.ck-focused[role="textbox"]),
