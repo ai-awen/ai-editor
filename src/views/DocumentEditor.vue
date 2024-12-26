@@ -103,7 +103,7 @@ const updateLineNumbers = () => {
       totalLines += paragraphLines
     })
 
-    // 如果没有内容���少显示一行
+    // 如果没有内容少显示一行
     totalLines = Math.max(1, totalLines)
     
     // 更新行号
@@ -215,55 +215,61 @@ const highlightCurrentLine = () => {
       element.classList.remove('current-line')
     })
 
-    // 获取当前选区
-    const selection = window.getSelection()
-    if (!selection || selection.rangeCount === 0) return
-
-    // 获取当前选区的范围
-    const range = selection.getRangeAt(0)
+    const editor = editorInstance.value
+    const selection = editor.editing.view.document.selection
     
     // 如果是选区（不是光标），则不高亮
-    if (!range.collapsed) return
+    if (!selection.isCollapsed) return
 
-    const currentNode = range.startContainer
+    // 获取光标位置的 DOM 元素
+    const viewPosition = selection.getFirstPosition()
+    if (!viewPosition) return
+
+    const domConverter = editor.editing.view.domConverter
+    const domPosition = domConverter.viewPositionToDom(viewPosition)
+    if (!domPosition) return
+    
+    // 获取最近的段落元素
+    let currentElement = domPosition.parent
+    while (currentElement && currentElement.nodeType !== Node.ELEMENT_NODE) {
+      currentElement = currentElement.parentNode
+    }
+
+    // 如果找不到元素节点，尝试使用文本节点的父元素
+    if (!currentElement && domPosition.parent) {
+      currentElement = domPosition.parent.parentElement
+    }
+
     const editorElement = document.querySelector('.ck-editor__editable')
-    if (!editorElement) return
+    if (!editorElement || !currentElement) return
 
-    // 查找当前段落
-    const currentParagraph = currentNode instanceof Element 
-      ? currentNode.closest('p') 
-      : currentNode.parentElement?.closest('p')
+    // 获取当前元素相对编辑器的位置
+    const elementRect = currentElement.getBoundingClientRect()
+    const editorRect = editorElement.getBoundingClientRect()
+    
+    // 计算光标在元素内的相对位置
+    const cursorOffset = domPosition.offset
+    const textNode = domPosition.parent
+    let cursorTop = elementRect.top
+    
+    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+      const range = document.createRange()
+      range.setStart(textNode, cursorOffset)
+      range.setEnd(textNode, cursorOffset)
+      const cursorRect = range.getBoundingClientRect()
+      cursorTop = cursorRect.top
+    }
 
-    if (currentParagraph) {
-      // 计算当前段落之前的所有段落的行数
-      const paragraphs = Array.from(editorElement.querySelectorAll('p'))
-      let currentLine = 0
+    const relativeTop = cursorTop - editorRect.top
 
-      for (let i = 0; i < paragraphs.length; i++) {
-        const paragraph = paragraphs[i]
-        if (paragraph === currentParagraph) {
-          // 找到当前段落，计算光标在段落内的行偏移
-          const computedStyle = window.getComputedStyle(paragraph)
-          const lineHeight = parseFloat(computedStyle.lineHeight)
-          const cursorTop = range.getBoundingClientRect().top
-          const paragraphTop = paragraph.getBoundingClientRect().top
-          const lineOffset = Math.floor((cursorTop - paragraphTop) / lineHeight)
-          currentLine += lineOffset + 1
-          break
-        } else {
-          // 累加之前段落的行数
-          const computedStyle = window.getComputedStyle(paragraph)
-          const paragraphHeight = paragraph.offsetHeight
-          const lineHeight = parseFloat(computedStyle.lineHeight)
-          currentLine += Math.ceil(paragraphHeight / lineHeight)
-        }
-      }
+    // 计算当前行号
+    const lineHeight = 21 // 固定行高
+    const currentLine = Math.floor(relativeTop / lineHeight) + 1
 
-      // 高亮对应的行号
-      const lineNumbers = document.querySelectorAll('.line-number')
-      if (currentLine > 0 && currentLine <= lineNumbers.length) {
-        lineNumbers[currentLine - 1].classList.add('current-line')
-      }
+    // 高亮对应的行号
+    const lineNumbers = document.querySelectorAll('.line-number')
+    if (currentLine > 0 && currentLine <= lineNumbers.length) {
+      lineNumbers[currentLine - 1].classList.add('current-line')
     }
   } catch (error) {
     console.error('Error highlighting current line:', error)
@@ -278,6 +284,16 @@ style.textContent = `
   padding: 0;
   min-height: 21px;
   line-height: 21px;
+}
+
+.ck-content {
+  min-height: 100%;
+  padding: 0;
+}
+
+.ck-content > * {
+  margin: 0 !important;
+  padding: 0 !important;
 }
 `
 document.head.appendChild(style)
