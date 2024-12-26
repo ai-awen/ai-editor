@@ -204,7 +204,7 @@ const onEditorChange = () => {
 
 /* CKEditor 样式覆盖 */
 :deep(.ck-editor__editable) {
-  padding: 0 1rem !important;
+  padding: 0 !important;
   line-height: 21px !important;
   height: 100% !important;
   min-height: unset !important;
@@ -216,7 +216,7 @@ const onEditorChange = () => {
   height: 100%;
   width: 100% !important;
   border: none !important;
-  padding: 1.5rem 2rem !important;
+  padding: 0 !important;
   line-height: 21px !important;
   max-width: none !important;
   margin: 0 !important;
@@ -267,7 +267,8 @@ const onEditorChange = () => {
   width: 100% !important;
   border: none !important;
   background: transparent !important;
-  padding: 8px 16px !important;
+  padding: 4px 8px !important;
+  margin: 0 !important;
 }
 
 :deep(.ck.ck-toolbar__items) {
@@ -332,7 +333,7 @@ const onEditorChange = () => {
   box-shadow: none !important;
 }
 
-/* 移除下拉��单的聚焦边框 */
+/* 移除下拉菜单的聚焦边框 */
 :deep(.ck.ck-dropdown__button:focus) {
   border: none !important;
   outline: none !important;
@@ -349,7 +350,7 @@ const onEditorChange = () => {
 
 /* 确保行号和编辑器内容对齐 */
 :deep(.ck-content) {
-  padding: 1.5rem 2rem !important;
+  padding: 0 !important;
   line-height: 21px !important;
   font-size: 14px !important;
 }
