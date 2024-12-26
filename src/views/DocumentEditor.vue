@@ -144,7 +144,8 @@ const onEditorReady = (editor: Editor) => {
       updateLineNumbers()
       setupResizeObserver(editorElement)
       
-      // 初始化时高亮第一行
+      // 自动获取焦点并触发高亮
+      editor.editing.view.focus()
       highlightCurrentLine()
     }
   })
@@ -160,6 +161,11 @@ const onEditorReady = (editor: Editor) => {
 
   // 监听光标位置变化
   editor.editing.view.document.on('selectionChange', () => {
+    requestAnimationFrame(highlightCurrentLine)
+  })
+
+  // 监听焦点变化
+  editor.editing.view.document.on('focus', () => {
     requestAnimationFrame(highlightCurrentLine)
   })
 
