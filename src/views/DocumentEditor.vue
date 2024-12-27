@@ -122,10 +122,16 @@ const updateLineNumbers = () => {
   }
 }
 
-// 使用 ResizeObserver 监听编辑器内容区域的小变化
+// 使用 ResizeObserver 监听编辑器内容区域的变化
 const setupResizeObserver = (editorElement: Element) => {
-  const resizeObserver = new ResizeObserver(() => {
-    updateLineNumbersDebounced()
+  const resizeObserver = new ResizeObserver((entries) => {
+    // 检查是否是宽度变化
+    const entry = entries[0]
+    if (entry) {
+      const { width: newWidth } = entry.contentRect
+      // 只在宽度变化时更新行号，不更新高亮
+      updateLineNumbersDebounced()
+    }
   })
 
   resizeObserver.observe(editorElement)
@@ -164,6 +170,9 @@ const onEditorReady = (editor: Editor) => {
         lineNumbers.scrollTop = editorElement.scrollTop
       }, { passive: true })
 
+      // 设置 ResizeObserver 监听编辑器宽度变化
+      setupResizeObserver(editorElement)
+
       // 自动获取焦点并触发高亮
       editor.editing.view.focus()
       highlightCurrentLine()
@@ -173,6 +182,7 @@ const onEditorReady = (editor: Editor) => {
   // 监听编辑器事件
   const handleChange = () => {
     requestAnimationFrame(() => {
+      // 内容变化时，同时更新行号和高亮
       updateLineNumbers()
       highlightCurrentLine()
     })
@@ -199,7 +209,7 @@ const onEditorReady = (editor: Editor) => {
     })
   })
 
-  // 组件销毁时
+  // 组件销毁时清理
   onBeforeUnmount(() => {
     const editorElement = document.querySelector('.ck-editor__editable')
     if (editorElement) {
@@ -277,7 +287,7 @@ const calculateCursorLine = (editor: any): number => {
             cursorTop = 0
           }
           
-          // 计算光标在块内的行偏移
+          // ��算光标在块内的行偏移
           const lineOffset = Math.floor(cursorTop / lineHeight)
           currentLine += lineOffset
         }
