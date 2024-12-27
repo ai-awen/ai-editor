@@ -175,9 +175,14 @@ const onEditorReady = (editor: Editor) => {
 
       // 添加 MutationObserver 监听内容变化
       const contentObserver = new MutationObserver((mutations) => {
-        requestAnimationFrame(() => {
+        // 使用 Promise.resolve() 确保在微任务队列中执行
+        Promise.resolve().then(() => {
           updateLineNumbers()
           highlightCurrentLine()
+          // 强制浏览器重新计算布局
+          (editorElement as HTMLElement).style.transform = 'translateZ(0)'
+          // 触发重排
+          const height = (editorElement as HTMLElement).offsetHeight
         })
       })
 
@@ -201,10 +206,17 @@ const onEditorReady = (editor: Editor) => {
 
   // 监听编辑器事件
   const handleChange = () => {
-    requestAnimationFrame(() => {
-      // 内容变化时，同时更新行号和高亮
-      updateLineNumbers()
-      highlightCurrentLine()
+    // 使用 Promise.resolve() 确保在微任务队列中执行
+    Promise.resolve().then(() => {
+      const editorElement = document.querySelector('.ck-editor__editable')
+      if (editorElement) {
+        updateLineNumbers()
+        highlightCurrentLine()
+        // 强制浏览器重新计算布局
+        (editorElement as HTMLElement).style.transform = 'translateZ(0)'
+        // 触发重排
+        const height = (editorElement as HTMLElement).offsetHeight
+      }
     })
   }
 
@@ -213,19 +225,26 @@ const onEditorReady = (editor: Editor) => {
 
   // 监听光标位置变化
   editor.editing.view.document.on('selectionChange', () => {
-    requestAnimationFrame(highlightCurrentLine)
+    Promise.resolve().then(highlightCurrentLine)
   })
 
   // 监听焦点变化
   editor.editing.view.document.on('focus', () => {
-    requestAnimationFrame(highlightCurrentLine)
+    Promise.resolve().then(highlightCurrentLine)
   })
 
   // 监听回车键
   editor.editing.view.document.on('enter', () => {
-    requestAnimationFrame(() => {
-      updateLineNumbers()
-      highlightCurrentLine()
+    Promise.resolve().then(() => {
+      const editorElement = document.querySelector('.ck-editor__editable')
+      if (editorElement) {
+        updateLineNumbers()
+        highlightCurrentLine()
+        // 强制浏览器重新计算布局
+        (editorElement as HTMLElement).style.transform = 'translateZ(0)'
+        // 触发重排
+        const height = (editorElement as HTMLElement).offsetHeight
+      }
     })
   })
 
@@ -405,10 +424,6 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-.line-number.current-line {
-  overflow: visible !important;
-}
-
 .line-highlight.active {
   position: absolute !important;
 }
@@ -454,7 +469,7 @@ onBeforeUnmount(() => {
   color: #999;
   user-select: none;
   text-align: right;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   z-index: 10;
 }
@@ -600,7 +615,7 @@ onBeforeUnmount(() => {
   height: 100%;
   position: relative !important;
   z-index: 1 !important;
-  overflow: hidden; /* 确保高亮不会超出容器 */
+  overflow: hidden; /* 确保高亮不会超出编辑器 */
 }
 
 /* 行号容样式 */
@@ -843,7 +858,7 @@ onBeforeUnmount(() => {
   font-size: 14px !important;
 }
 
-/* ��化行号容器的滚动行为 */
+/* 化行号容器的��动行为 */
 .line-numbers {
   overflow-y: hidden;
   overflow-x: hidden;
