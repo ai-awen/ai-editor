@@ -2,11 +2,11 @@
   <div class="document-editor">
     <div class="editor-container">
       <div class="line-numbers">
-        <div 
-          v-for="n in lineCount" 
-          :key="n" 
-          class="line-number"
-          :class="{ 'current-line': n === currentLineNumber }"
+        <div
+            v-for="n in lineCount"
+            :key="n"
+            class="line-number"
+            :class="{ 'current-line': n === currentLineNumber }"
         >
           <div class="line-highlight" :class="{ active: n === currentLineNumber }"></div>
           {{ n }}
@@ -14,10 +14,10 @@
       </div>
       <div class="editor-wrapper">
         <ckeditor
-          :editor="editor"
-          v-model="editorData"
-          :config="editorConfig"
-          @ready="onEditorReady"
+            :editor="editor"
+            v-model="editorData"
+            :config="editorConfig"
+            @ready="onEditorReady"
         ></ckeditor>
       </div>
     </div>
@@ -25,10 +25,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { DecoupledEditor } from './ckeditor'
-import { CKEditor } from '@ckeditor/ckeditor5-vue'
-import type { Editor } from '@ckeditor/ckeditor5-core'
+import {ref, onMounted, onBeforeUnmount} from 'vue'
+import {DecoupledEditor} from './ckeditor'
+import {CKEditor} from '@ckeditor/ckeditor5-vue'
+import type {Editor} from '@ckeditor/ckeditor5-core'
 
 const editor = ref(DecoupledEditor)
 const editorInstance = ref<Editor | null>(null)
@@ -96,7 +96,7 @@ const updateLineNumbers = () => {
     if (!editorElement) return
 
     const blocks = Array.from(editorElement.children) as HTMLElement[]
-    
+
     // 即使没有内容块，也至少显示一行
     if (blocks.length === 0) {
       lineCount.value = 1
@@ -128,7 +128,7 @@ const setupResizeObserver = (editorElement: Element) => {
     // 检查是否是宽度变化
     const entry = entries[0]
     if (entry) {
-      const { width: newWidth } = entry.contentRect
+      const {width: newWidth} = entry.contentRect
       // 只在宽度变化时更新行号，不更新高亮
       updateLineNumbersDebounced()
     }
@@ -156,26 +156,46 @@ const updateLineNumbersDebounced = () => {
 // 编辑器就绪事件处理
 const onEditorReady = (editor: Editor) => {
   editorInstance.value = editor
-  
+
   // 等 DOM 更新后再初始化
   requestAnimationFrame(() => {
     const editorElement = document.querySelector('.ck-editor__editable')
     const lineNumbers = document.querySelector('.line-numbers')
     if (editorElement && lineNumbers) {
       updateLineNumbers()
-      
+
       // 监听编辑器滚动
       editorElement.addEventListener('scroll', () => {
         // 同步行号容器的滚动位置
         lineNumbers.scrollTop = editorElement.scrollTop
-      }, { passive: true })
+      }, {passive: true})
 
       // 设置 ResizeObserver 监听编辑器宽度变化
       setupResizeObserver(editorElement)
 
+      // 添加 MutationObserver 监听内容变化
+      const contentObserver = new MutationObserver((mutations) => {
+        requestAnimationFrame(() => {
+          updateLineNumbers()
+          highlightCurrentLine()
+        })
+      })
+
+      contentObserver.observe(editorElement, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        attributes: false
+      })
+
       // 自动获取焦点并触发高亮
       editor.editing.view.focus()
       highlightCurrentLine()
+
+      // 组件卸载时清理 MutationObserver
+      onBeforeUnmount(() => {
+        contentObserver.disconnect()
+      })
     }
   })
 
@@ -213,7 +233,8 @@ const onEditorReady = (editor: Editor) => {
   onBeforeUnmount(() => {
     const editorElement = document.querySelector('.ck-editor__editable')
     if (editorElement) {
-      editorElement.removeEventListener('scroll', () => {})
+      editorElement.removeEventListener('scroll', () => {
+      })
     }
     editor.model.document.off('change:data', handleChange)
   })
@@ -237,7 +258,7 @@ const calculateCursorLine = (editor: any): number => {
 
     // 获取所有块级元素
     const blocks = Array.from(editorElement.children) as HTMLElement[]
-    
+
     // 处理空内容的情况
     if (blocks.length === 0) {
       return 1
@@ -263,18 +284,18 @@ const calculateCursorLine = (editor: any): number => {
       if (block === currentBlock || block.contains(currentBlock)) {
         foundCurrentBlock = true
         currentLine += 1 // 当前块本身算一行
-        
+
         // 如果当前块有多行，需要计算光标在块内的具体行位置
         const blockHeight = block.offsetHeight
         const lineHeight = 21
         const totalBlockLines = Math.ceil(blockHeight / lineHeight)
-        
+
         if (totalBlockLines > 1) {
           // 计算光标在块内的位置
           const blockRect = block.getBoundingClientRect()
           const editorRect = editorElement.getBoundingClientRect()
           const scrollTop = editorElement.scrollTop
-          
+
           // 获取光标的具体位置
           let cursorTop
           if (domPosition.parent.nodeType === Node.TEXT_NODE) {
@@ -286,8 +307,8 @@ const calculateCursorLine = (editor: any): number => {
           } else {
             cursorTop = 0
           }
-          
-          // ��算光标在块内的行偏移
+
+          // 计算光标在块内的行偏移
           const lineOffset = Math.floor(cursorTop / lineHeight)
           currentLine += lineOffset
         }
@@ -382,6 +403,14 @@ onBeforeUnmount(() => {
 <style>
 .document-editor {
   overflow: hidden;
+}
+
+.line-number.current-line {
+  overflow: visible !important;
+}
+
+.line-highlight.active {
+  position: absolute !important;
 }
 
 .editor-wrapper {
@@ -814,7 +843,7 @@ onBeforeUnmount(() => {
   font-size: 14px !important;
 }
 
-/* 优化行号容器的滚动行为 */
+/* ��化行号容器的滚动行为 */
 .line-numbers {
   overflow-y: hidden;
   overflow-x: hidden;
