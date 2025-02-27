@@ -2,14 +2,16 @@
   <div class="document-editor">
     <div class="editor-container">
       <div class="line-numbers">
-        <div
-            v-for="n in lineCount"
-            :key="n"
-            class="line-number"
-            :class="{ 'current-line': n === currentLineNumber }"
-        >
-          <div class="line-highlight" :class="{ active: n === currentLineNumber }"></div>
-          {{ n }}
+        <div class="line-numbers-content">
+          <div
+              v-for="n in lineCount"
+              :key="n"
+              class="line-number"
+              :class="{ 'current-line': n === currentLineNumber }"
+          >
+            <div class="line-highlight" :class="{ active: n === currentLineNumber }"></div>
+            {{ n }}
+          </div>
         </div>
       </div>
       <div class="editor-wrapper">
@@ -93,7 +95,12 @@ const updateLineNumbers = () => {
 
   try {
     const editorElement = document.querySelector('.ck-editor__editable')
-    if (!editorElement) return
+    const lineNumbersContent = document.querySelector('.line-numbers-content')
+    
+    if (editorElement && lineNumbersContent) {
+      // 同步内容高度
+      lineNumbersContent.style.height = `${editorElement.scrollHeight}px`
+    }
 
     const blocks = Array.from(editorElement.children) as HTMLElement[]
 
@@ -167,7 +174,10 @@ const onEditorReady = (editor: Editor) => {
       // 监听编辑器滚动
       editorElement.addEventListener('scroll', () => {
         // 同步行号容器的滚动位置
-        lineNumbers.scrollTop = editorElement.scrollTop
+        const lineNumbersContent = document.querySelector('.line-numbers-content')
+        if (lineNumbersContent) {
+          lineNumbersContent.style.transform = `translateY(-${editorElement.scrollTop}px)`
+        }
       }, {passive: true})
 
       // 设置 ResizeObserver 监听编辑器宽度变化
@@ -175,14 +185,9 @@ const onEditorReady = (editor: Editor) => {
 
       // 添加 MutationObserver 监听内容变化
       const contentObserver = new MutationObserver((mutations) => {
-        // 使用 Promise.resolve() 确保在微任务队列中执行
-        Promise.resolve().then(() => {
+        requestAnimationFrame(() => {
           updateLineNumbers()
           highlightCurrentLine()
-          // 强制浏览器重新计算布局
-          (editorElement as HTMLElement).style.transform = 'translateZ(0)'
-          // 触发重排
-          const height = (editorElement as HTMLElement).offsetHeight
         })
       })
 
@@ -206,17 +211,10 @@ const onEditorReady = (editor: Editor) => {
 
   // 监听编辑器事件
   const handleChange = () => {
-    // 使用 Promise.resolve() 确保在微任务队列中执行
-    Promise.resolve().then(() => {
-      const editorElement = document.querySelector('.ck-editor__editable')
-      if (editorElement) {
-        updateLineNumbers()
-        highlightCurrentLine()
-        // 强制浏览器重新计算布局
-        (editorElement as HTMLElement).style.transform = 'translateZ(0)'
-        // 触发重排
-        const height = (editorElement as HTMLElement).offsetHeight
-      }
+    requestAnimationFrame(() => {
+      // 内容变化时，同时更新行号和高亮
+      updateLineNumbers()
+      highlightCurrentLine()
     })
   }
 
@@ -225,26 +223,19 @@ const onEditorReady = (editor: Editor) => {
 
   // 监听光标位置变化
   editor.editing.view.document.on('selectionChange', () => {
-    Promise.resolve().then(highlightCurrentLine)
+    requestAnimationFrame(highlightCurrentLine)
   })
 
   // 监听焦点变化
   editor.editing.view.document.on('focus', () => {
-    Promise.resolve().then(highlightCurrentLine)
+    requestAnimationFrame(highlightCurrentLine)
   })
 
   // 监听回车键
   editor.editing.view.document.on('enter', () => {
-    Promise.resolve().then(() => {
-      const editorElement = document.querySelector('.ck-editor__editable')
-      if (editorElement) {
-        updateLineNumbers()
-        highlightCurrentLine()
-        // 强制浏览器重新计算布局
-        (editorElement as HTMLElement).style.transform = 'translateZ(0)'
-        // 触发重排
-        const height = (editorElement as HTMLElement).offsetHeight
-      }
+    requestAnimationFrame(() => {
+      updateLineNumbers()
+      highlightCurrentLine()
     })
   })
 
@@ -424,6 +415,10 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
+.line-number.current-line {
+  overflow: visible !important;
+}
+
 .line-highlight.active {
   position: absolute !important;
 }
@@ -463,15 +458,23 @@ onBeforeUnmount(() => {
   min-width: 50px;
   background: #f5f5f5;
   border-right: 1px solid #e8e8e8;
-  padding: 0 0.5rem;
+  padding: 0;
   font-family: monospace;
   font-size: 12px;
   color: #999;
   user-select: none;
   text-align: right;
-  overflow: visible;
+  overflow: hidden;
   position: relative;
   z-index: 10;
+}
+
+.line-numbers-content {
+  position: absolute;
+  width: 100%;
+  min-height: 100%;
+  padding: 0 4px;
+  box-sizing: border-box;
 }
 
 .line-number {
@@ -615,7 +618,7 @@ onBeforeUnmount(() => {
   height: 100%;
   position: relative !important;
   z-index: 1 !important;
-  overflow: hidden; /* 确保高亮不会超出编辑器 */
+  overflow: hidden; /* 确保高亮不会超出容器 */
 }
 
 /* 行号容样式 */
@@ -858,7 +861,7 @@ onBeforeUnmount(() => {
   font-size: 14px !important;
 }
 
-/* 化行号容器的��动行为 */
+/* 化行号容器的滚动行为 */
 .line-numbers {
   overflow-y: hidden;
   overflow-x: hidden;
